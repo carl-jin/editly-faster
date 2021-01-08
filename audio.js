@@ -59,7 +59,7 @@ module.exports = ({ffmpegPath, ffprobePath, enableFfmpegLog, verbose}) => {
               atempoFilter = `atempo=${framePtsFactor}`;
             }
 
-            const cutToArg = stop;
+            const cutToArg = stop ? stop : (audioCutTo - cutFrom) * framePtsFactor;
 
             const args = [
               ...getFfmpegCommonArgs({enableFfmpegLog}),
