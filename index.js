@@ -398,7 +398,11 @@ module.exports = async (config = {}) => {
       '-map', '0:v:0',
       ...(audioFilePath ? ['-map', '1:a:0'] : []),
 
-      ...(audioFilePath ? ['-acodec', 'aac', '-b:a', '128k'] : []),
+      ...(audioFilePath ? [
+        '-acodec', 'aac',
+        '-b:a', '64k',
+        '-ar', '48000',
+        '-af',"aresample=async=1000"] : []),
 
       ...outputArgs,
     ];
