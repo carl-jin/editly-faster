@@ -392,17 +392,14 @@ module.exports = async (config = {}) => {
       '-s', `${width}x${height}`,
       '-r', framerateStr,
       '-i', '-',
+      '-ss', '0',
 
       ...(audioFilePath ? [...loopAudioArgs, '-i', audioFilePath, '-shortest'] : []),
 
       '-map', '0:v:0',
       ...(audioFilePath ? ['-map', '1:a:0'] : []),
 
-      ...(audioFilePath ? [
-        '-acodec', 'aac',
-        '-b:a', '64k',
-        '-ar', '48000',
-        '-af',"aresample=async=1000"] : []),
+      ...(audioFilePath ? ['-acodec', 'aac', '-b:a', '128k'] : []),
 
       ...outputArgs,
     ];

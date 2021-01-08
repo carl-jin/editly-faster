@@ -1,14 +1,14 @@
 const pMap = require('p-map');
-const { join, basename, resolve } = require('path');
+const {join, basename, resolve} = require('path');
 const execa = require('execa');
 const flatMap = require('lodash/flatMap');
 const fs = require('fs-extra');
 
-const { getFfmpegCommonArgs, getCutFromArgs, createConcatFile } = require('./ffmpeg');
-const { readFileStreams } = require('./util');
+const {getFfmpegCommonArgs, getCutFromArgs, createConcatFile} = require('./ffmpeg');
+const {readFileStreams} = require('./util');
 
-module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
-  async function editAudio({ clips, tmpDir }) {
+module.exports = ({ffmpegPath, ffprobePath, enableFfmpegLog, verbose}) => {
+  async function editAudio({clips, tmpDir}) {
     if (clips.length === 0) return undefined;
 
     console.log('Extracting audio or creating silence from all clips');
@@ -18,7 +18,7 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
     const segments = await pMap(clips, async (clip, i) => {
       const clipAudioPath = join(tmpDir, `clip${i}-audio.flac`);
 
-      const audioLayers = clip.layers.filter(({ type, visibleFrom, visibleUntil }) => (
+      const audioLayers = clip.layers.filter(({type, visibleFrom, visibleUntil}) => (
         ['audio', 'video'].includes(type)
         // TODO We don't support audio for visibleFrom/visibleUntil layers
         && !visibleFrom && visibleUntil == null));
@@ -39,7 +39,7 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
 
       if (audioLayers.length > 0) {
         const processedAudioLayersRaw = await pMap(audioLayers, async (audioLayer, j) => {
-          const { path, cutFrom, audioCutTo, framePtsFactor } = audioLayer;
+          const {path, cutFrom, audioCutTo, framePtsFactor, stop} = audioLayer;
 
           const streams = await readFileStreams(ffprobePath, path);
           if (!streams.some((s) => s.codec_type === 'audio')) return undefined;
@@ -48,27 +48,28 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
 
           try {
             let atempoFilter;
-            if (Math.abs(framePtsFactor - 1) > 0.01) {
+            // if (Math.abs(framePtsFactor - 1) > 0.01) {
+            if (1 - framePtsFactor > 0) {
               if (verbose) console.log('audio framePtsFactor', framePtsFactor);
               const atempo = (1 / framePtsFactor);
               if (!(atempo >= 0.5 && atempo <= 100)) { // Required range by ffmpeg
                 console.warn(`Audio speed ${atempo} is outside accepted range, using silence (clip ${i})`);
                 return undefined;
               }
-              atempoFilter = `atempo=${atempo}`;
+              atempoFilter = `atempo=${framePtsFactor}`;
             }
 
-            const cutToArg = (audioCutTo - cutFrom) * framePtsFactor;
+            const cutToArg = stop;
 
             const args = [
-              ...getFfmpegCommonArgs({ enableFfmpegLog }),
-              ...getCutFromArgs({ cutFrom }),
+              ...getFfmpegCommonArgs({enableFfmpegLog}),
+              ...getCutFromArgs({cutFrom}),
               '-i', path,
               '-t', cutToArg,
               '-sample_fmt', 's32',
               '-ar', '48000',
               '-map', 'a:0', '-c:a', 'flac',
-              ...(atempoFilter ? ['-filter:a', atempoFilter] : []),
+              '-filter:a', 'apad,loudnorm',
               '-y',
               layerAudioPath,
             ];
@@ -81,18 +82,18 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
             await createSilence(layerAudioPath);
           }
 
-          return { layerAudioPath, audioLayer };
-        }, { concurrency: 4 });
+          return {layerAudioPath, audioLayer};
+        }, {concurrency: 4});
 
         const processedAudioLayers = processedAudioLayersRaw.filter((p) => p);
 
         if (processedAudioLayers.length > 1) {
           // Merge/mix all layer's audio
 
-          const weights = processedAudioLayers.map(({ audioLayer }) => (audioLayer.mixVolume != null ? audioLayer.mixVolume : 1));
+          const weights = processedAudioLayers.map(({audioLayer}) => (audioLayer.mixVolume != null ? audioLayer.mixVolume : 1));
           const args = [
-            ...getFfmpegCommonArgs({ enableFfmpegLog }),
-            ...flatMap(processedAudioLayers, ({ layerAudioPath }) => ['-i', layerAudioPath]),
+            ...getFfmpegCommonArgs({enableFfmpegLog}),
+            ...flatMap(processedAudioLayers, ({layerAudioPath}) => ['-i', layerAudioPath]),
             '-filter_complex', `amix=inputs=${processedAudioLayers.length}:duration=longest:weights=${weights.join(' ')}`,
             '-c:a', 'flac',
             '-y',
@@ -111,7 +112,7 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
 
       // https://superuser.com/a/853262/658247
       return resolve(clipAudioPath);
-    }, { concurrency: 4 });
+    }, {concurrency: 4});
 
     const concatFilePath = join(tmpDir, 'audio-segments.txt');
 
@@ -120,7 +121,7 @@ module.exports = ({ ffmpegPath, ffprobePath, enableFfmpegLog, verbose }) => {
     await createConcatFile(segments, concatFilePath);
 
     const args = [
-      ...getFfmpegCommonArgs({ enableFfmpegLog }),
+      ...getFfmpegCommonArgs({enableFfmpegLog}),
       '-f', 'concat', '-safe', '0',
       '-i', concatFilePath,
       '-c', 'flac',
