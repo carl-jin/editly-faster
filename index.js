@@ -354,8 +354,8 @@ module.exports = async (config = {}) => {
   console.log(`${width}x${height} ${fps}fps`);
 
   const estimatedTotalFrames = fps * clips.reduce((acc, c, i) => {
-    let newAcc = acc + c.duration;
-    if (i !== clips.length - 1) newAcc -= c.transition.duration;
+    let newAcc = acc + Number(c.duration);
+    if (i !== clips.length - 1) newAcc -= Number(c.transition.duration);
     return newAcc;
   }, 0);
 
