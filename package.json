@@ -1,12 +1,12 @@
 {
   "name": "editly-faster",
   "description": "fork from mifi/editly 0.6.3 version",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "main": "index.js",
   "author": "Carl Jin <buffpal2016@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "canvas": "^2.6.1",
+    "canvas": "^2.7.0",
     "execa": "^4.0.0",
     "fabric": "^4.1.0",
     "file-type": "^14.1.4",
